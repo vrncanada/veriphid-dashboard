@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation"
-import { createServerSupabaseClient } from "@/lib/supabase"
+import { createServerSupabaseClient } from "@/lib/supabase-server"
 import { computeHCS } from "@/lib/hcs"
 import { BadgeChip } from "@/components/BadgeChip"
 import { HCSGauge } from "@/components/HCSGauge"
