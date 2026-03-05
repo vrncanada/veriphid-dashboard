@@ -50,14 +50,10 @@ CREATE POLICY "Create workspace"
   ON public.workspaces FOR INSERT
   WITH CHECK (owner_id = auth.uid());
 
-CREATE POLICY "Read workspace as member"
+-- NOTE: "Read workspace as member" is added AFTER workspace_members is created (see below).
+CREATE POLICY "Owner read workspace"
   ON public.workspaces FOR SELECT
-  USING (
-    owner_id = auth.uid()
-    OR id IN (
-      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
-    )
-  );
+  USING (owner_id = auth.uid());
 
 CREATE POLICY "Owner update workspace"
   ON public.workspaces FOR UPDATE
@@ -65,6 +61,7 @@ CREATE POLICY "Owner update workspace"
 
 -- ============================================================
 -- workspace_members — employees who have joined a workspace via invite code
+-- Must be created before the member-referencing workspace SELECT policy.
 -- ============================================================
 CREATE TABLE IF NOT EXISTS public.workspace_members (
   workspace_id uuid        NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
@@ -86,6 +83,15 @@ CREATE POLICY "Read workspace members"
 CREATE POLICY "Join workspace"
   ON public.workspace_members FOR INSERT
   WITH CHECK (user_id = auth.uid());
+
+-- Now workspace_members exists — add the member-visibility policy to workspaces.
+CREATE POLICY "Member read workspace"
+  ON public.workspaces FOR SELECT
+  USING (
+    id IN (
+      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
+    )
+  );
 
 -- ============================================================
 -- document_badges — signed provenance badge tied to a specific document
