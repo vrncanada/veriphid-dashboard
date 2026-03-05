@@ -2,16 +2,16 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function proxy(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+  try {
+    const url  = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    if (!url || !anon) return NextResponse.next({ request })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
+    let supabaseResponse = NextResponse.next({ request })
+
+    const supabase = createServerClient(url, anon, {
       cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
+        getAll() { return request.cookies.getAll() },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
@@ -20,22 +20,26 @@ export async function proxy(request: NextRequest) {
           )
         },
       },
-    },
-  )
+    })
 
-  // Refresh session token
-  const { data: { user } } = await supabase.auth.getUser()
+    // Refresh session token
+    const { data: { user } } = await supabase.auth.getUser()
 
-  // Protect /dashboard and /session routes
-  const url = request.nextUrl
-  if (!user && (url.pathname.startsWith("/dashboard") || url.pathname.startsWith("/session"))) {
-    const loginUrl = url.clone()
-    loginUrl.pathname = "/login"
-    loginUrl.searchParams.set("redirect", url.pathname)
-    return NextResponse.redirect(loginUrl)
+    // Protect /dashboard and /session routes — server pages also check auth,
+    // but this gives a faster redirect without an extra DB call.
+    const pathname = request.nextUrl.pathname
+    if (!user && (pathname.startsWith("/dashboard") || pathname.startsWith("/session"))) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = "/login"
+      loginUrl.searchParams.set("redirect", pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    return supabaseResponse
+  } catch {
+    // Never let proxy errors break page rendering
+    return NextResponse.next({ request })
   }
-
-  return supabaseResponse
 }
 
 export const config = {
