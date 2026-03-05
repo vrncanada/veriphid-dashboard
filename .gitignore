@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# circom intermediate files (compiled outputs committed separately)
+circuits/*.r1cs
+circuits/*.sym
+circuits/*_js/
+circuits/hcs_0.zkey
+pot12_*.ptau
