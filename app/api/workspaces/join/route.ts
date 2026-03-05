@@ -1,4 +1,12 @@
 import { createServerSupabaseClient } from "@/lib/supabase-server"
+import { createClient } from "@supabase/supabase-js"
+
+// Admin client bypasses RLS — used only to look up the workspace by invite_code.
+// A non-member cannot see the workspace via the user client (RLS blocks it).
+const adminSupabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)
 
 export async function POST(req: Request) {
   const supabase = await createServerSupabaseClient()
@@ -8,7 +16,8 @@ export async function POST(req: Request) {
   const { inviteCode } = await req.json()
   if (!inviteCode?.trim()) return Response.json({ error: "Invite code required" }, { status: 400 })
 
-  const { data: workspace, error: wErr } = await supabase
+  // Use admin client so the lookup works regardless of membership status
+  const { data: workspace, error: wErr } = await adminSupabase
     .from("workspaces")
     .select("id, name")
     .eq("invite_code", inviteCode.trim())
