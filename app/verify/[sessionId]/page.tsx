@@ -11,12 +11,33 @@ interface Props { params: Promise<{ sessionId: string }> }
 
 export default async function VerifyPage({ params }: Props) {
   const { sessionId } = await params
-  const supabase = await createServerSupabaseClient()
 
-  const [{ data: manifest }, { data: proof }] = await Promise.all([
+  let supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
+  try {
+    supabase = await createServerSupabaseClient()
+  } catch (err) {
+    return (
+      <div className="p-6 rounded-xl bg-red-900/20 border border-red-700 text-red-300 text-sm font-mono">
+        <p className="font-bold mb-1">Supabase client error</p>
+        <p>{err instanceof Error ? err.message : String(err)}</p>
+      </div>
+    )
+  }
+
+  const [{ data: manifest, error: mErr }, { data: proof }] = await Promise.all([
     supabase.from("manifests").select("*").eq("session_id", sessionId).single(),
     supabase.from("proofs").select("*").eq("session_id", sessionId).maybeSingle(),
   ])
+
+  if (mErr) {
+    return (
+      <div className="p-6 rounded-xl bg-red-900/20 border border-red-700 text-red-300 text-sm font-mono">
+        <p className="font-bold mb-1">Database error</p>
+        <p>{mErr.message}</p>
+        <p className="text-xs text-red-400 mt-1">Code: {mErr.code}</p>
+      </div>
+    )
+  }
 
   if (!manifest) notFound()
 
