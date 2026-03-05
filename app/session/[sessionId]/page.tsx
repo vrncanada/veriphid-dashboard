@@ -4,8 +4,6 @@ import { computeHCS } from "@/lib/hcs"
 import { BadgeChip } from "@/components/BadgeChip"
 import { HCSGauge } from "@/components/HCSGauge"
 import { ActivityTimeline } from "@/components/ActivityTimeline"
-import { SignatureCard } from "@/components/SignatureCard"
-import { SessionZKPPanel } from "./SessionZKPPanel"
 
 interface Props { params: Promise<{ sessionId: string }> }
 
@@ -16,10 +14,11 @@ export default async function SessionPage({ params }: Props) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect("/login")
 
-  const [{ data: manifest }, { data: proof }] = await Promise.all([
-    supabase.from("manifests").select("*").eq("session_id", sessionId).single(),
-    supabase.from("proofs").select("*").eq("session_id", sessionId).maybeSingle(),
-  ])
+  const { data: manifest } = await supabase
+    .from("manifests")
+    .select("*")
+    .eq("session_id", sessionId)
+    .single()
 
   if (!manifest) notFound()
 
@@ -29,6 +28,7 @@ export default async function SessionPage({ params }: Props) {
   const lastAction = manifest.actions[manifest.actions.length - 1]
   const meta = lastAction?.parameters?.entropyMetadata ?? {}
   const hcs  = computeHCS(meta)
+  const syncedAt = manifest.last_synced_at ?? manifest.signed_at
 
   return (
     <div className="space-y-6">
@@ -63,23 +63,19 @@ export default async function SessionPage({ params }: Props) {
           </div>
           <div>
             <div className="text-slate-500 text-xs mb-1">Actions recorded</div>
-            <div className="text-slate-200">{manifest.action_count}</div>
+            <div className="text-slate-200">{manifest.action_count ?? manifest.actions?.length ?? 0}</div>
           </div>
           <div>
-            <div className="text-slate-500 text-xs mb-1">Signed at</div>
-            <div className="text-slate-200">{new Date(manifest.signed_at).toLocaleString()}</div>
+            <div className="text-slate-500 text-xs mb-1">Last synced</div>
+            <div className="text-slate-200">
+              {syncedAt ? new Date(syncedAt).toLocaleString() : "—"}
+            </div>
           </div>
           <div>
             <div className="text-slate-500 text-xs mb-1">Status</div>
-            <div className="text-green-400">✓ Signed &amp; Saved</div>
+            <div className="text-green-400">✓ Synced</div>
           </div>
         </div>
-      </div>
-
-      {/* ZKP panel (interactive, client component) */}
-      <div>
-        <h2 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Zero-Knowledge Proof</h2>
-        <SessionZKPPanel sessionId={sessionId} hcsScore={hcs} existingProof={proof} />
       </div>
 
       {/* Activity timeline */}
@@ -88,12 +84,6 @@ export default async function SessionPage({ params }: Props) {
         <div className="rounded-xl bg-slate-800/30 border border-slate-700 p-4">
           <ActivityTimeline actions={manifest.actions} />
         </div>
-      </div>
-
-      {/* Signature */}
-      <div>
-        <h2 className="text-sm font-semibold text-slate-400 mb-3 uppercase tracking-wider">Cryptographic Proof</h2>
-        <SignatureCard manifest={manifest} />
       </div>
     </div>
   )
