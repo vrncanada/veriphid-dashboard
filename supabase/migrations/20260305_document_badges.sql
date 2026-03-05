@@ -71,14 +71,11 @@ CREATE TABLE IF NOT EXISTS public.workspace_members (
 );
 ALTER TABLE public.workspace_members ENABLE ROW LEVEL SECURITY;
 
+-- Simple: each user sees only their own membership rows.
+-- Do NOT self-reference workspace_members here — causes infinite recursion.
 CREATE POLICY "Read workspace members"
   ON public.workspace_members FOR SELECT
-  USING (
-    user_id = auth.uid()
-    OR workspace_id IN (
-      SELECT workspace_id FROM public.workspace_members WHERE user_id = auth.uid()
-    )
-  );
+  USING (user_id = auth.uid());
 
 CREATE POLICY "Join workspace"
   ON public.workspace_members FOR INSERT
